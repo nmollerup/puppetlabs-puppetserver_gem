@@ -5,7 +5,7 @@ require 'stringio'
 require 'uri'
 
 # Ruby gems support.
-Puppet::Type.type(:package).provide :puppetserver_gem, :parent => :gem do
+Puppet::Type.type(:package).provide :puppetserver_gem, parent: :gem do
   desc "Puppet Server Ruby Gem support. If a URL is passed via `source`, then
     that URL is appended to the list of remote gem repositories which by default
     contains rubygems.org; To ensure that only the specified source is used also
@@ -16,7 +16,7 @@ Puppet::Type.type(:package).provide :puppetserver_gem, :parent => :gem do
 
   has_feature :versionable, :install_options, :uninstall_options
 
-  confine :feature => :hocon
+  confine feature: :hocon
 
   # Define the default provider package command name, as the parent 'gem' provider is targetable.
   # Required by Puppet::Provider::Package::Targetable::resource_or_provider_command
@@ -29,23 +29,23 @@ Puppet::Type.type(:package).provide :puppetserver_gem, :parent => :gem do
   # CommandDefiner in provider.rb will set failonfail, combine, and environment.
 
   has_command(:puppetservercmd, '/opt/puppetlabs/bin/puppetserver') do
-    environment(:HOME => ENV['HOME'])
+    environment(HOME: ENV['HOME'])
   end
 
   def self.gemlist(options)
     command_options = ['gem', 'list']
 
-    if options[:local]
-      command_options << '--local'
-    else
-      command_options << '--remote'
-    end
+    command_options << if options[:local]
+                         '--local'
+                       else
+                         '--remote'
+                       end
 
     if options[:source]
       command_options << "--source #{options[:source]}"
     end
 
-    if name = options[:justme]
+    if name == options[:justme]
       gem_regex = '\A' + name + '\z'
       command_options << gem_regex
     end
@@ -56,7 +56,7 @@ Puppet::Type.type(:package).provide :puppetserver_gem, :parent => :gem do
       begin
         list = puppetservercmd(command_options)
       rescue Puppet::ExecutionFailure => detail
-        raise Puppet::Error, _("Could not list gems: %{detail}") % { detail: detail }, detail.backtrace
+        raise Puppet::Error, _('Could not list gems: %{detail}') % { detail: detail }, detail.backtrace
       end
     end
 
@@ -66,14 +66,12 @@ Puppet::Type.type(:package).provide :puppetserver_gem, :parent => :gem do
     # Warning: Could not match *** LOCAL GEMS ***
     gem_list = list
                .lines
-               .select { |x| x =~ /^(\S+)\s+\((.+)\)/ }
+               .select { |x| x =~ %r{/^(\S+)\s+\((.+)\)/} }
                .map { |set| gemsplit(set) }
 
-    if options[:justme]
-      return gem_list.shift
-    else
-      return gem_list
-    end
+    return gem_list.shift if options[:justme]
+
+    gem_list
   end
 
   # The puppetserver gem cli command is very slow, since it starts a JVM.
@@ -105,7 +103,7 @@ Puppet::Type.type(:package).provide :puppetserver_gem, :parent => :gem do
       gem_env['GEM_HOME'] = puppetserver_conf['jruby-puppet'].key?('gem-home') ? puppetserver_conf['jruby-puppet']['gem-home'] : puppetserver_default_gem_home
       gem_env['GEM_PATH'] = puppetserver_conf['jruby-puppet'].key?('gem-path') ? puppetserver_conf['jruby-puppet']['gem-path'].join(':') : puppetserver_default_gem_path
     end
-    gem_env['GEM_SPEC_CACHE'] = "/tmp/#{$$}"
+    gem_env['GEM_SPEC_CACHE'] = "/tmp/#{$PID}"
     Gem.paths = gem_env
 
     sio_inn = StringIO.new
@@ -121,7 +119,7 @@ Puppet::Type.type(:package).provide :puppetserver_gem, :parent => :gem do
     # There is no method exclude default gems from the local gem list,
     # for example: psych (default: 2.2.2)
     # but default gems should not be managed by this (or any) provider.
-    gem_list = sio_out.string.lines.reject { |gem| gem =~ / \(default\: / }
+    gem_list = sio_out.string.lines.reject { |gem| gem.include?('(default:') }
     gem_list.join("\n")
   ensure
     Gem.clear_paths
@@ -135,7 +133,7 @@ Puppet::Type.type(:package).provide :puppetserver_gem, :parent => :gem do
 
     command_options << '--no-document'
 
-    if source = resource[:source]
+    if source == resource[:source]
       begin
         uri = URI.parse(source)
       rescue => detail
@@ -146,14 +144,14 @@ Puppet::Type.type(:package).provide :puppetserver_gem, :parent => :gem do
       when nil
         # no URI scheme => interpret the source as a local file
         command_options << source
-      when /file/i
+      when %r{/file/i}
         command_options << uri.path
       when 'puppet'
         # we don't support puppet:// URLs (yet)
-        raise Puppet::Error.new(_('puppet:// URLs are not supported as gem sources'))
+        raise Puppet::Error, _('puppet:// URLs are not supported as gem sources')
       else
         # interpret it as a gem repository
-        command_options << '--source' << "#{source}" << resource[:name]
+        command_options << '--source' << to_s(source) << resource[:name]
       end
     else
       command_options << resource[:name]
@@ -161,7 +159,7 @@ Puppet::Type.type(:package).provide :puppetserver_gem, :parent => :gem do
 
     output = puppetservercmd(command_options)
     # Apparently, some gem versions don't exit non-0 on failure.
-    self.fail _("Could not install: %{output}") % { output: output.chomp } if output.include?('ERROR')
+    self.fail _('Could not install: %{output}') % { output: output.chomp } if output.include?('ERROR')
   end
 
   def uninstall
@@ -171,6 +169,6 @@ Puppet::Type.type(:package).provide :puppetserver_gem, :parent => :gem do
 
     output = puppetservercmd(command_options)
     # Apparently, some gem versions don't exit non-0 on failure.
-    self.fail _("Could not uninstall: %{output}") % { output: output.chomp } if output.include?('ERROR')
+    self.fail _('Could not uninstall: %{output}') % { output: output.chomp } if output.include?('ERROR')
   end
 end

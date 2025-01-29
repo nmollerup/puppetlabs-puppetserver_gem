@@ -10,7 +10,7 @@ if ENV['BEAKER_provision'] != 'no'
 end
 
 RSpec.configure do |c|
-  proj_root = File.expand_path(File.join(File.dirname(__FILE__), '..'))
+  # proj_root = File.expand_path(File.join(File.dirname(__FILE__), '..'))
   c.formatter = :documentation
   c.before :suite do
     unless ENV['BEAKER_TESTMODE'] == 'local'
